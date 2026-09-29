@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Tracer - Livestock Health Monitor</title>
+<style>
+:root{--ink:#17241c;--pasture:#1f3b2d;--field:#eef2ec;--card:#fff;--line:#cfd8cc;
+--ok:#2f7d4a;--warn:#b57a00;--crit:#b3261e;--sky:#2a6f97}
+*{box-sizing:border-box}
+body{margin:0;background:var(--field);color:var(--ink);font:16px/1.55 "Segoe UI",system-ui,sans-serif}
+.top{background:var(--pasture);color:#fff;padding:1.5rem clamp(1rem,5vw,3rem);position:relative}
+.top h1{margin:0;font:700 2.4rem/1.1 Georgia,"Times New Roman",serif}
+.top p{margin:.3rem 0 0;color:#c9dccd}
+.mode{position:absolute;right:clamp(1rem,5vw,3rem);top:1.5rem;font-size:.85rem;padding:.25rem .7rem;border:1px solid #6f9a80;border-radius:99px}
+main{max-width:1100px;margin:0 auto;padding:1.5rem clamp(1rem,4vw,2rem)}
+h2{font:700 1.3rem Georgia,serif;margin:1.6rem 0 .7rem}
+.summary{display:flex;flex-wrap:wrap;gap:2rem;padding:.5rem 0 1rem;border-bottom:2px solid var(--pasture)}
+.summary div{min-width:110px}
+.summary b{display:block;font:700 2.6rem/1 Georgia,serif}
+.summary span{font-size:.9rem;color:#4b5d51}
+.outbreak{margin-top:1rem;padding:.8rem 1rem;background:#fbe9e7;border:1px solid var(--crit);color:var(--crit);border-radius:6px;font-weight:600}
+.cols{display:grid;grid-template-columns:1.2fr 1fr;gap:2rem}
+ul{list-style:none;margin:0;padding:0}
+.herd li{display:flex;justify-content:space-between;align-items:center;padding:.7rem .9rem;background:var(--card);border:1px solid var(--line);border-left:6px solid var(--ok);border-radius:6px;margin-bottom:.5rem}
+.herd li.warning{border-left-color:var(--warn)}.herd li.critical{border-left-color:var(--crit)}
+.herd small{display:block;color:#5b6d61}
+.pill{font-size:.8rem;padding:.15rem .6rem;border-radius:99px;background:#e2efe6;color:var(--ok)}
+.warning .pill{background:#fbf0d5;color:var(--warn)}.critical .pill{background:#fbe0dd;color:var(--crit)}
+.form{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1rem;display:grid;gap:.8rem}
+.form label{display:grid;gap:.25rem;font-size:.9rem;font-weight:600}
+input,select{padding:.5rem;border:1px solid #9fb0a3;border-radius:4px;font:inherit}
+fieldset{border:1px solid var(--line);border-radius:4px;display:flex;flex-wrap:wrap;gap:.3rem .9rem}
+.chk{display:flex!important;grid-auto-flow:column;align-items:center;gap:.4rem;font-weight:400!important}
+button{background:var(--sky);color:#fff;border:0;padding:.7rem;border-radius:4px;font:600 1rem inherit;cursor:pointer}
+button:hover{background:#225a7a}
+:focus-visible{outline:3px solid #f2b705;outline-offset:2px}
+.result{margin:0;font-weight:600}
+.alerts li{padding:.8rem 1rem;background:var(--card);border:1px solid var(--line);border-left:6px solid var(--warn);border-radius:6px;margin-bottom:.5rem}
+.alerts li.critical{border-left-color:var(--crit)}
+.alerts time{color:#5b6d61;font-size:.85rem}
+.empty{color:#5b6d61;font-style:italic}
+footer{text-align:center;padding:2rem 1rem;color:#5b6d61;font-size:.85rem}
+@media(max-width:760px){.cols{grid-template-columns:1fr}.mode{position:static;display:inline-block;margin-top:.7rem}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Case Tracer</h1>
+  <p>Livestock health monitoring and early disease detection</p>
+  <span id="mode" class="mode" role="status"></span>
+</header>
+
+<main>
+  <section id="summary" class="summary" aria-label="Farm summary"></section>
+  <div id="outbreak" class="outbreak" hidden></div>
+
+  <div class="cols">
+    <section aria-labelledby="h-herd">
+      <h2 id="h-herd">Herd</h2>
+      <ul id="herd" class="herd"></ul>
+    </section>
+
+    <section aria-labelledby="h-log">
+      <h2 id="h-log">Log a health check</h2>
+      <form id="form" class="form">
+        <label>Animal <select id="animal" required></select></label>
+        <label>Body temperature (&deg;C) <input id="temp" type="number" step="0.1" min="30" max="45" value="38.6" required></label>
+        <label>Activity score (0-100) <input id="activity" type="number" min="0" max="100" value="70" required></label>
+        <fieldset>
+          <legend>Symptoms seen by farmer</legend>
+          <label class="chk"><input type="checkbox" value="cough">Coughing</label>
+          <label class="chk"><input type="checkbox" value="nasal discharge">Nasal discharge</label>
+          <label class="chk"><input type="checkbox" value="limping">Limping</label>
+          <label class="chk"><input type="checkbox" value="reduced appetite">Reduced appetite</label>
+          <label class="chk"><input type="checkbox" value="diarrhoea">Diarrhoea</label>
+        </fieldset>
+        <button type="submit">Check animal</button>
+        <p id="result" class="result" aria-live="polite"></p>
+      </form>
+    </section>
+  </div>
+
+  <section aria-labelledby="h-alerts">
+    <h2 id="h-alerts">Alerts</h2>
+    <ul id="alerts" class="alerts"></ul>
+  </section>
+</main>
+
+<footer>Alerts support veterinary assessment. Treatment remains a veterinary decision.</footer>
+<script>
+const API = localStorage.getItem("apiUrl") || "http://localhost:8000";
+const $ = id => document.getElementById(id);
+let online = false;
+
+// Demo data + rules used only when the backend is unreachable
+const demo = { animals: [
+  {id:1,tag:"COW-101",species:"Cow",status:"normal"},
+  {id:2,tag:"COW-102",species:"Cow",status:"normal"},
+  {id:3,tag:"GOAT-201",species:"Goat",status:"normal"}], alerts: [] };
+
+function assess(temp, activity, symptoms) {
+  const reasons = []; let score = 0;
+  if (temp >= 40.5) { score += 3; reasons.push("very high temperature"); }
+  else if (temp >= 39.5) { score += 2; reasons.push("high temperature"); }
+  else if (temp < 37.5) { score += 2; reasons.push("low temperature"); }
+  if (activity < 30) { score += 2; reasons.push("very low activity"); }
+  else if (activity < 50) { score += 1; reasons.push("low activity"); }
+  if (symptoms.length) { score += symptoms.length; reasons.push("symptoms: " + symptoms.join(", ")); }
+  return { level: score >= 4 ? "critical" : score >= 2 ? "warning" : "normal", reasons };
+}
+
+async function api(path, opts) {
+  const r = await fetch(API + path, opts);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function load() {
+  let animals, alerts, summary;
+  try {
+    [animals, alerts, summary] = await Promise.all([api("/animals"), api("/alerts"), api("/dashboard")]);
+    online = true;
+  } catch {
+    online = false; animals = demo.animals; alerts = demo.alerts;
+    const bad = animals.filter(a => a.status !== "normal").length;
+    summary = { total: animals.length, at_risk: bad, open_alerts: alerts.length, outbreak: bad >= 3 };
+  }
+  $("mode").textContent = online ? "Connected to server" : "Demo mode (server not reachable)";
+  render(animals, alerts, summary);
+}
+
+function render(animals, alerts, s) {
+  $("summary").innerHTML =
+    `<div><b>${s.total}</b><span>Animals</span></div>
+     <div><b>${s.at_risk}</b><span>Need attention</span></div>
+     <div><b>${s.open_alerts}</b><span>Alerts</span></div>`;
+  $("outbreak").hidden = !s.outbreak;
+  $("outbreak").textContent = "Possible outbreak: several animals show risk signs. Call your veterinarian.";
+  $("herd").innerHTML = animals.map(a =>
+    `<li class="${a.status}"><span>${a.tag}<small>${a.species}</small></span><span class="pill">${a.status}</span></li>`).join("");
+  $("animal").innerHTML = animals.map(a => `<option value="${a.id}">${a.tag}</option>`).join("");
+  $("alerts").innerHTML = alerts.length
+    ? alerts.map(a => `<li class="${a.level}"><strong>${a.tag}</strong>: ${a.message}<br><time>${new Date(a.created_at).toLocaleString()}</time></li>`).join("")
+    : `<li class="empty">No alerts yet. Log a health check to get started.</li>`;
+}
+
+$("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const id = +$("animal").value, temp = +$("temp").value, activity = +$("activity").value;
+  const symptoms = [...document.querySelectorAll(".chk input:checked")].map(c => c.value);
+  let res;
+  if (online) {
+    try {
+      res = await api("/readings", { method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ animal_id: id, temperature: temp, activity, symptoms }) });
+    } catch { $("result").textContent = "Could not save the reading. Check the server and try again."; return; }
+  } else {
+    res = assess(temp, activity, symptoms);
+    const a = demo.animals.find(x => x.id === id); a.status = res.level;
+    if (res.level !== "normal") demo.alerts.unshift({ tag: a.tag, level: res.level,
+      message: res.reasons.join("; "), created_at: new Date().toISOString() });
+  }
+  $("result").textContent = res.level === "normal" ? "Normal. No action needed."
+    : `${res.level.toUpperCase()}: ${res.reasons.join("; ")}. Contact a veterinarian.`;
+  load();
+});
+
+load();
+</script>
+</body>
+</html>

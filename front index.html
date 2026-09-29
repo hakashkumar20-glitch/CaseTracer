@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Tracer - Livestock Health Monitor</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <h1>Case Tracer</h1>
+  <p>Livestock health monitoring and early disease detection</p>
+  <span id="mode" class="mode" role="status"></span>
+</header>
+
+<main>
+  <section id="summary" class="summary" aria-label="Farm summary"></section>
+  <div id="outbreak" class="outbreak" hidden></div>
+
+  <div class="cols">
+    <section aria-labelledby="h-herd">
+      <h2 id="h-herd">Herd</h2>
+      <ul id="herd" class="herd"></ul>
+    </section>
+
+    <section aria-labelledby="h-log">
+      <h2 id="h-log">Log a health check</h2>
+      <form id="form" class="form">
+        <label>Animal <select id="animal" required></select></label>
+        <label>Body temperature (&deg;C) <input id="temp" type="number" step="0.1" min="30" max="45" value="38.6" required></label>
+        <label>Activity score (0-100) <input id="activity" type="number" min="0" max="100" value="70" required></label>
+        <fieldset>
+          <legend>Symptoms seen by farmer</legend>
+          <label class="chk"><input type="checkbox" value="cough">Coughing</label>
+          <label class="chk"><input type="checkbox" value="nasal discharge">Nasal discharge</label>
+          <label class="chk"><input type="checkbox" value="limping">Limping</label>
+          <label class="chk"><input type="checkbox" value="reduced appetite">Reduced appetite</label>
+          <label class="chk"><input type="checkbox" value="diarrhoea">Diarrhoea</label>
+        </fieldset>
+        <button type="submit">Check animal</button>
+        <p id="result" class="result" aria-live="polite"></p>
+      </form>
+    </section>
+  </div>
+
+  <section aria-labelledby="h-alerts">
+    <h2 id="h-alerts">Alerts</h2>
+    <ul id="alerts" class="alerts"></ul>
+  </section>
+</main>
+
+<footer>Alerts support veterinary assessment. Treatment remains a veterinary decision.</footer>
+<script src="js/app.js"></script>
+</body>
+</html>
